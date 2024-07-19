@@ -11,45 +11,23 @@
 
 import os
 import sys
+import re
 import argparse
 import logging
 from pathlib import Path
 
-# 当前工作路径。
-work_path = Path.cwd()
-
-# 根目录路径
-root_path = work_path
-
-# APP 名称，例如：NewApp
-app_name = 'NewApp'
-
-# APP 文件夹名称，例如：newapp
-app_file_name = f'{app_name.lower()}'
-
-# APP 配置项的名称，例如：MMI_SUPPORT_NEWAPP
-app_configuration_name = f'MMI_SUPPORT_{app_name.upper()}'
-
-# APP 宏控的宏名，例如：CONFIG_MMI_SUPPORT_NEWAPP
-app_macro_name = f'CONFIG_MMI_SUPPORT_{app_name.upper()}'
-
-# APP 类名，例如：NewApp
-app_class_name = app_name
-
-# 客户端类名，例如：NewAppclient
-app_client_class_name = f'{app_name}Client'
-
-# 资源文件名称，例如：NewApp_res
-res_h_file_name = f'{app_name}_res'
-
-# APP 文件名称，例如：NewAppAPP
-app_h_file_name = f'{app_name}APP'
-
-# 客户端文件名称，例如：NewAppClient
-client_h_file_name = f'{app_name}Client'
-
-# 分辨率
-resolution = 'asr-480x960'
+def get_element_value(element):
+    version_pattern = re.compile(f"^# {element}:\\s*(.*)$", re.MULTILINE)
+    try:
+        with open(__file__, 'r', encoding='utf-8') as file:
+            content = file.read()
+            match = version_pattern.search(content)
+            if match:
+                return match.group(1)
+            else:
+                return r'unkonw.'
+    except FileNotFoundError:
+        return r'unkonw.'
 
 def insert_text_fun(file_name, pattern, insert_text, position):
     try:
@@ -180,7 +158,6 @@ set (apollo_app_dirs
 endif()
 '''
 
-    # 定义要插入的文本
     insert_text2 = f'''
 if (DEFINED {app_macro_name})
 list(APPEND mgapollo_head_files
@@ -487,14 +464,11 @@ end_respkg
 
     for file_path, file_content in source_file_path.items():
 
-        # 获取文件夹路径
         folder_path = os.path.dirname(file_path)
 
-        # 创建文件夹（如果不存在）
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        # 写入文件数据
         with open(file_path, 'w') as f:
             f.write(file_content)
 
@@ -548,14 +522,11 @@ NGBool Entry{app_name}(Intent* intent);
 
 def add_mainframe_entry():
 
-    # 需要修改的文件的路径
     file_name = root_path.joinpath(r'evb/src/gui/mgapollo/apps/launcher/src/MainFrame.cpp')
 
-    # 定义要匹配的函数名
     pattern_head = r'static APP_ITEM_INFO s_main_app_items[]'
     pattern_end = r'};'
 
-    # 定义要插入的文本
     insert_text = f'''\
 #ifdef {app_macro_name}
     {{ Entry{app_name},     STRID_APP_CCA_STR_ID_CCA_SETTING_INFO,
@@ -589,8 +560,7 @@ def arg_parse():
     parser.add_argument('resolution', help='The resolution of the device, for example: asr-128x160 or asr-128x64-FWP.')
 
     # Add otions arguments
-    parser.add_argument('-v','--version', help='Show version.',action='version',version='1.0.0')
-    parser.add_argument('-exe', help='Generate exe file.')
+    parser.add_argument('-v','--version', help='Show version.',action='version',version=f'python version:{sys.version}, soft version: {get_element_value(r'@Version')}')
 
     # Check if there are no arguments
     if len(sys.argv) <= 1:
@@ -635,11 +605,47 @@ if __name__ == "__main__":
     # 启动日志
     start_log()
 
+    # APP 名称，例如：NewApp
+    app_name = 'NewApp'
+
+    # 分辨率
+    resolution = 'asr-480x960'
+
     # 处理参数
     arg_parse()
 
+    # 当前工作路径。
+    work_path = Path.cwd()
+
+    # 根目录路径
+    root_path = work_path
+
     # 处理路径
     deal_path()
+
+    # APP 文件夹名称，例如：newapp
+    app_file_name = f'{app_name.lower()}'
+
+    # APP 配置项的名称，例如：MMI_SUPPORT_NEWAPP
+    app_configuration_name = f'MMI_SUPPORT_{app_name.upper()}'
+
+    # APP 宏控的宏名，例如：CONFIG_MMI_SUPPORT_NEWAPP
+    app_macro_name = f'CONFIG_MMI_SUPPORT_{app_name.upper()}'
+
+    # APP 类名，例如：NewApp
+    app_class_name = app_name
+
+    # 客户端类名，例如：NewAppclient
+    app_client_class_name = f'{app_name}Client'
+
+    # 资源文件名称，例如：NewApp_res
+    res_h_file_name = f'{app_name}_res'
+
+    # APP 文件名称，例如：NewAppAPP
+    app_h_file_name = f'{app_name}APP'
+
+    # 客户端文件名称，例如：NewAppClient
+    client_h_file_name = f'{app_name}Client'
 
     # 增加配置项
     add_configuration_items()
