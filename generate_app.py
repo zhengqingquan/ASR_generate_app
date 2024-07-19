@@ -3,16 +3,23 @@
 
 # @File: generate_app.py
 # @Auther: zhengqingquan
-# @Date: 2024/07/18
+# @Create: 2024/07/18
+# @Update: 2024/07/19
 # @Version: 1.0.0
 # @Brief: Based on ASR platform code, it is possible to automatically generate Python scripts for the APP.
 # @Instructions: Place the script in the root directory, modify the name of the app you need, and then execute it. And open the corresponding macro control.
 
 import os
 import sys
-import re
 import argparse
 import logging
+from pathlib import Path
+
+# 当前工作路径。
+work_path = Path.cwd()
+
+# 根目录路径
+root_path = work_path
 
 # APP 名称，例如：NewApp
 app_name = 'NewApp'
@@ -48,15 +55,24 @@ def insert_text_fun(file_name, pattern, insert_text, position):
     try:
         # 读取文件内容
         with open(file_name, 'r', encoding='utf-8') as file:
+            # 插入内容已经存在
             if insert_text in file.read():
                 return logging.info(f'Content repetition:{insert_text}')
+            # 重置文件读取指针位置
+            file.seek(0)
             lines = file.readlines()
 
-        # 找到匹配的位置
+        # 寻找匹配的位置
+        match_found = False
         for i in range(len(lines)):
-            line = lines[i].strip()
-            if pattern in line:
-                lines.insert(i + position, insert_text) # 插入位置在匹配行的下一行
+            if pattern in lines[i]:
+                match_found = True
+                lines.insert(i + position, insert_text)
+                break
+
+        # 未找到匹配内容。
+        if not match_found:
+            return logging.info(f'{file_name} no match found for pattern: {pattern}')
 
         # 写入文件
         with open(file_name, 'w') as file:
@@ -64,15 +80,62 @@ def insert_text_fun(file_name, pattern, insert_text, position):
     except FileNotFoundError:
         logging.error(f"File {file_name} not exist!")
 
+def insert_func_end_fun(file_name, pattern_head, pattern_end, insert_text, position):
+    try:
+        # 读取文件内容
+        with open(file_name, 'r') as file:
+            # 插入内容已经存在
+            if insert_text in file.read():
+                return logging.info(f'Content repetition:{insert_text}')
+            # 重置文件读取指针位置
+            file.seek(0)
+            lines = file.readlines()
+
+        # 找到匹配行的位置
+        match_found_pattern_head = False
+        match_found_pattern_end = False
+        for i in range(len(lines)):
+            # 寻找匹配的开头
+            if pattern_head in lines[i]:
+                match_found_pattern_head = True
+            # 已经找到匹配开头的情况下，寻找匹配的结尾
+            if match_found_pattern_head and pattern_end in lines[i]:
+                match_found_pattern_end = True
+                lines.insert(i + position, insert_text)
+                break
+
+        # 未找到匹配内容。
+        if not match_found_pattern_head:
+            return logging.info(f'{file_name} no match found for pattern: {pattern_head}')
+        if not match_found_pattern_end:
+            return logging.info(f'{file_name} no match found for pattern: {pattern_end}')
+
+        # 将修改后的内容写回文件
+        with open(file_name, 'w') as file:
+            file.writelines(lines)
+    except FileNotFoundError:
+        logging.error(f"File {file_name} not exist!")
+
+def insert_file_end(file_name, insert_text):
+    try:
+        # 读取文件内容
+        with open(file_name, 'r') as file:
+            # 插入内容已经存在
+            if insert_text in file.read():
+                return logging.info(f'Content repetition:{insert_text}')
+
+        # 在文件末尾追加文本
+        with open(file_name, 'a') as file:
+            file.write(insert_text)
+    except FileNotFoundError:
+        logging.error(f"File {file_name} not exist!")
+
 def add_configuration_items():
 
-    # 需要修改的文件的路径
-    file_name = 'evb/src/gui/Kconfig'
+    file_name = root_path.joinpath(r'evb/src/gui/Kconfig')
 
-    # 定义匹配的正则表达式模式，寻找需要插入的位置。
-    pattern = r'^menu "mUI app configurations"$'
+    pattern = r'menu "mUI app configurations"'
 
-    # 定义要插入的文本
     insert_text = f'''
 config {app_configuration_name}
 	bool "enable {app_name} app"
@@ -81,80 +144,44 @@ config {app_configuration_name}
 	  Select this option if you want to support {app_name}.
 '''
 
-    # 读取文件内容
-    with open(file_name, 'r') as file:
-        lines = file.readlines()
-
-    # 找到匹配的位置
-    for i in range(len(lines)):
-        line = lines[i].strip()
-        if re.match(pattern, line):
-            lines.insert(i + 1, insert_text) # 插入位置在匹配行的下一行
-
-    # 写入文件
-    with open(file_name, 'w') as file:
-        file.writelines(lines)
+    insert_text_fun(file_name, pattern, insert_text, 1)
 
 def modify_cmake_file():
-    # 文件名
-    file_name = 'evb/src/gui/mgapollo/CMakeLists.txt'
 
-    # 定义要插入的文本
+    file_name = root_path.joinpath(r'evb/src/gui/mgapollo/CMakeLists.txt')
+
     insert_text = f'''
-if (DEFINED CONFIG_MMI_SUPPORT_{app_name.upper()})
+if (DEFINED {app_macro_name})
     file(GLOB {app_name}_cpp_files   RELATIVE ${{CMAKE_CURRENT_SOURCE_DIR}}
         apps/{app_name}/src/*.cpp
     )
     set (library_cpp_files ${{library_cpp_files}} ${{{app_name}_cpp_files}})
-endif()'''
+endif()
+'''
 
-    # 定义匹配的正则表达式模式
-    pattern = r'^file\(GLOB library_cpp_files\s+RELATIVE\s+\${CMAKE_CURRENT_SOURCE_DIR}$'
-    pattern2 = r'^\)$'
+    pattern_head = r'file(GLOB library_cpp_files   RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}'
+    pattern_end = r')'
 
-    # 读取文件内容
-    with open(file_name, 'r') as file:
-        lines = file.readlines()
-
-    # 找到匹配行的位置
-    match_indices = []
-    is_statr_search_right_bracket = False
-    for i in range(len(lines)):
-        line = lines[i].strip()
-        if re.match(pattern, line):
-            is_statr_search_right_bracket = True
-        if re.match(pattern2, line) and is_statr_search_right_bracket:
-            match_indices.append(i + 1)  # 插入位置在匹配行的下一行
-            break
-
-    # 在匹配行的下一行插入文本
-    for index in match_indices:
-        lines.insert(index, insert_text + '\n')
-
-    # 将修改后的内容写回文件
-    with open(file_name, 'w') as file:
-        file.writelines(lines)
+    insert_func_end_fun(file_name, pattern_head, pattern_end, insert_text, 1)
 
 def modify_rules_cmake_file():
-    # 文件名
-    file_name = 'evb/src/gui/mgapollo/rules.cmake'
 
-    # 定义要匹配的函数名
-    function_name = 'set(apollo_app_dirs'
+    file_name = root_path.joinpath(r'evb/src/gui/mgapollo/rules.cmake')
 
-    # 定义要插入的文本
-    insert_text1 = f'''\
+    pattern_head = r'set(apollo_app_dirs'
+    pattern_end = r')'
+
+    insert_text1 = f'''
 if (DEFINED {app_macro_name})
 set (apollo_app_dirs
     ${{apollo_app_dirs}}
     {app_name.lower()}
 )
 endif()
-
 '''
-    # 定义要插入的文本
-    insert_text2 = f'''\
 
+    # 定义要插入的文本
+    insert_text2 = f'''
 if (DEFINED {app_macro_name})
 list(APPEND mgapollo_head_files
 					"${{__G_MG_SIMULATOR_GEN_DIR}}/mgapollo/apps/{app_file_name}/include"
@@ -162,74 +189,24 @@ list(APPEND mgapollo_head_files
 endif()
 '''
 
-    # 读取文件内容
-    with open(file_name, 'r') as file:
-        lines = file.readlines()
+    insert_func_end_fun(file_name, pattern_head, pattern_end, insert_text1, 1)
 
-    # 找到函数的开始和结束位置
-    start_index = -1
-    end_index = -1
-    for i, line in enumerate(lines):
-        if function_name in line:
-            start_index = i
-        if start_index != -1 and ')' in line:
-            end_index = i
-            break
-
-    if start_index == -1 or end_index == -1:
-        print(f"Error: Function '{function_name}' not found in file '{file_name}'")
-        return
-
-    # 在函数体的末尾添加所需内容。
-    lines.insert(end_index + 2, insert_text1)
-
-    # 写入文件
-    with open(file_name, 'w') as file:
-        file.writelines(lines)
-
-    # 在文件末尾追加文本
-    with open(file_name, 'a') as file:
-        file.write(insert_text2)
+    insert_file_end(file_name, insert_text2)
 
 def add_respkg_id():
 
-    # 文件名
-    file_name = 'evb/src/gui/mgapollo/apps/include/appcommoninclue.h'
+    file_name = root_path.joinpath(r'evb/src/gui/mgapollo/apps/include/appcommoninclue.h')
 
-    # 定义要匹配的函数名
-    function_name = 'enum  _RES'
+    pattern_head = r'enum  _RES'
+    pattern_end = r'//TODO'
 
-    # 定义要插入的文本
-    insert_text1 = f'''\
+    insert_text = f'''\
 #ifdef {app_macro_name}
 	RES_PKG_{app_name.upper()}_ID,
 #endif
 '''
 
-    # 读取文件内容
-    with open(file_name, 'r') as file:
-        lines = file.readlines()
-
-    # 找到函数的开始和结束位置
-    start_index = -1
-    end_index = -1
-    for i, line in enumerate(lines):
-        if function_name in line:
-            start_index = i
-        if start_index != -1 and '//TODO' in line:
-            end_index = i
-            break
-
-    if start_index == -1 or end_index == -1:
-        print(f"Error: Function '{function_name}' not found in file '{file_name}'")
-        return
-
-    # 在函数体的末尾添加所需内容。
-    lines.insert(end_index, insert_text1)
-
-    # 写入文件
-    with open(file_name, 'w') as file:
-        file.writelines(lines)
+    insert_func_end_fun(file_name, pattern_head, pattern_end, insert_text, 0)
 
 def create_source_file():
 
@@ -499,13 +476,13 @@ end_respkg
 '''
 
     source_file_path = {
-        f"evb/src/gui/mgapollo/apps/{app_name.lower()}/include/{res_h_file_name}.h":app_res_h,
-        f"evb/src/gui/mgapollo/apps/{app_name.lower()}/include/{app_h_file_name}.h":app_app_h,
-        f"evb/src/gui/mgapollo/apps/{app_name.lower()}/include/{client_h_file_name}.h":app_client_h,
-        f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{res_h_file_name}.cpp":app_res_cpp,
-        f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{app_h_file_name}.cpp":app_app_cpp,
-        f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{client_h_file_name}.cpp":app_client_cpp,
-        f"evb/src/gui/mgapollo/resdesc/{resolution}/{app_name.lower()}/include/{app_name.lower()}.res.c":app_res_c,
+        root_path.joinpath(f"evb/src/gui/mgapollo/apps/{app_name.lower()}/include/{res_h_file_name}.h"):app_res_h,
+        root_path.joinpath(f"evb/src/gui/mgapollo/apps/{app_name.lower()}/include/{app_h_file_name}.h"):app_app_h,
+        root_path.joinpath(f"evb/src/gui/mgapollo/apps/{app_name.lower()}/include/{client_h_file_name}.h"):app_client_h,
+        root_path.joinpath(f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{res_h_file_name}.cpp"):app_res_cpp,
+        root_path.joinpath(f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{app_h_file_name}.cpp"):app_app_cpp,
+        root_path.joinpath(f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{client_h_file_name}.cpp"):app_client_cpp,
+        root_path.joinpath(f"evb/src/gui/mgapollo/resdesc/{resolution}/{app_name.lower()}/include/{app_name.lower()}.res.c"):app_res_c,
     }
 
     for file_path, file_content in source_file_path.items():
@@ -517,22 +494,19 @@ end_respkg
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        # 创建文件
+        # 写入文件数据
         with open(file_path, 'w') as f:
             f.write(file_content)
 
 def create_inner_res():
     pass
 
-def add_respkg_enum():
-    # evb/src/gui/mgapollo/apps/include/appcommoninclue.h
-    pass
-
 def add_entry_function():
-    # 文件名
-    file_name = 'evb/src/gui/mgapollo/apps/src/Apollo.cpp'
 
-    # 定义要插入的文本
+    file_name = root_path.joinpath(r'evb/src/gui/mgapollo/apps/src/Apollo.cpp')
+
+    pattern = r'NGBool EntryBootUp (Intent *intent)'
+
     insert_text = f'''\
 #ifdef {app_macro_name}
 NGBool Entry{app_name} (Intent *intent)
@@ -541,41 +515,17 @@ NGBool Entry{app_name} (Intent *intent)
     return true;
 }}
 #endif
+
 '''
 
-    # 定义匹配的正则表达式模式
-    pattern = r'^NGBool EntryBootUp \(Intent \*intent\)$'
-
-    # 读取文件内容
-    with open(file_name, 'r') as file:
-        lines = file.readlines()
-
-    # 找到匹配行的位置
-    match_indices = []
-    for i in range(len(lines)):
-        line = lines[i].strip()
-        if re.match(pattern, line):
-            match_indices.append(i)
-
-    # 在匹配行的下一行插入文本
-    for index in match_indices:
-        lines.insert(index, insert_text + '\n')
-
-    # 将修改后的内容写回文件
-    with open(file_name, 'w') as file:
-        file.writelines(lines)
+    insert_text_fun(file_name, pattern, insert_text, 0)
 
 def add_entry_function2():
 
-    # 需要修改的文件的路径
-    file_name = 'evb/src/gui/mgapollo/apps/include/appcommoninclue.h'
+    file_name = root_path.joinpath(r'evb/src/gui/mgapollo/apps/include/appcommoninclue.h')
 
-    # 定义匹配的正则表达式模式，寻找需要插入的位置。
-    pattern = r'^#undef __APP_ENTRIES__$'
+    pattern = r'#undef __APP_ENTRIES__'
 
-    pattern2 = r'^#undef __APP_APOLLO__$'
-
-    # 定义要插入的文本
     insert_text = f'''\
 #ifdef {app_macro_name}
 NGBool Entry{app_name}(Intent* intent);
@@ -583,7 +533,10 @@ NGBool Entry{app_name}(Intent* intent);
 
 '''
 
-    # 定义要插入的文本
+    insert_text_fun(file_name, pattern, insert_text, 0)
+
+    pattern2 = r'#undef __APP_APOLLO__'
+
     insert_text2 = f'''\
 #ifdef {app_macro_name}
 #include "{app_h_file_name}.h"
@@ -591,37 +544,16 @@ NGBool Entry{app_name}(Intent* intent);
 
 '''
 
-    # 读取文件内容
-    with open(file_name, 'r') as file:
-        lines = file.readlines()
-
-    # 找到匹配的位置
-    for i in range(len(lines)):
-        line = lines[i].strip()
-        if re.match(pattern, line):
-            # BUG 没有break会输出四行。
-            lines.insert(i, insert_text) # 插入位置在匹配行的下一行
-            break
-
-    # 找到匹配的位置
-    for i in range(len(lines)):
-        line = lines[i].strip()
-        if re.match(pattern2, line):
-            # BUG 没有break会输出四行。
-            lines.insert(i, insert_text2) # 插入位置在匹配行的下一行
-            break
-
-    # 写入文件
-    with open(file_name, 'w') as file:
-        file.writelines(lines)
+    insert_text_fun(file_name, pattern2, insert_text2, 0)
 
 def add_mainframe_entry():
 
     # 需要修改的文件的路径
-    file_name = 'evb/src/gui/mgapollo/apps/launcher/src/MainFrame.cpp'
+    file_name = root_path.joinpath(r'evb/src/gui/mgapollo/apps/launcher/src/MainFrame.cpp')
 
     # 定义要匹配的函数名
-    function_name = r'static APP_ITEM_INFO s_main_app_items[]'
+    pattern_head = r'static APP_ITEM_INFO s_main_app_items[]'
+    pattern_end = r'};'
 
     # 定义要插入的文本
     insert_text = f'''\
@@ -631,69 +563,22 @@ def add_mainframe_entry():
 #endif
 '''
 
-    # 读取文件内容
-    with open(file_name, 'r') as file:
-        lines = file.readlines()
-
-    # 找到函数的开始和结束位置
-    start_index = -1
-    end_index = -1
-    for i, line in enumerate(lines):
-        if function_name in line:
-            start_index = i
-        if start_index != -1 and '};' in line:
-            end_index = i
-            break
-
-    if start_index == -1 or end_index == -1:
-        print(f"Error: Function '{function_name}' not found in file '{file_name}'")
-        return
-
-    # 在函数体的末尾添加所需内容。
-    lines.insert(end_index, insert_text)
-
-    # 写入文件
-    with open(file_name, 'w') as file:
-        file.writelines(lines)
+    insert_func_end_fun(file_name, pattern_head, pattern_end, insert_text, 0)
 
 def add_app_register():
-    # 文件名
-    file_name = 'evb/src/gui/mgapollo/apps/src/Apollo.cpp'
 
-    # 定义要匹配的函数名
-    function_name = 'registerAppFactories'
+    file_name = root_path.joinpath(r'evb/src/gui/mgapollo/apps/src/Apollo.cpp')
 
-    # 定义要插入的文本
+    pattern_head = 'registerAppFactories'
+    pattern_end = r'}'
+
     insert_text = f'''\
 #ifdef {app_macro_name}
     REGISTER_APP("{app_name.lower()}", {app_class_name});
 #endif
 '''
 
-    # 读取文件内容
-    with open(file_name, 'r') as file:
-        lines = file.readlines()
-
-    # 找到函数的开始和结束位置
-    start_index = -1
-    end_index = -1
-    for i, line in enumerate(lines):
-        if function_name in line:
-            start_index = i
-        if start_index != -1 and '}' in line:
-            end_index = i
-            break
-
-    if start_index == -1 or end_index == -1:
-        print(f"Error: Function '{function_name}' not found in file '{file_name}'")
-        return
-
-    # 在函数体的末尾添加所需内容。
-    lines.insert(end_index, insert_text)
-
-    # 写入文件
-    with open(file_name, 'w') as file:
-        file.writelines(lines)
+    insert_func_end_fun(file_name, pattern_head, pattern_end, insert_text, 0)
 
 def arg_parse():
     # Create parameter parser.
@@ -704,7 +589,8 @@ def arg_parse():
     parser.add_argument('resolution', help='The resolution of the device, for example: asr-128x160 or asr-128x64-FWP.')
 
     # Add otions arguments
-    parser.add_argument('-v','--version', help='show version',action='version',version='1.0.0')
+    parser.add_argument('-v','--version', help='Show version.',action='version',version='1.0.0')
+    parser.add_argument('-exe', help='Generate exe file.')
 
     # Check if there are no arguments
     if len(sys.argv) <= 1:
@@ -727,57 +613,58 @@ def start_log():
     # Set the log level to DEBUG to record logs of all levels
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-if __name__ == "__main__":
+def deal_path():
+    global work_path, root_path
 
-    # TODO 优化代码减小冗余。
-    # TODO 优化代码，如果需要添加的内容已经存在，则不添加。防止重复调用的时候，重复添加字符串。
+    # 文件夹路径。
+    if (work_path / 'evb').exists():
+        root_path = work_path
+        logging.info('Currently in the root directory.')
+    elif work_path.name == 'evb':
+        root_path = work_path.parent
+        logging.info('Currently in the evb directory.')
+    else:
+        logging.error("The execution path is incorrect! Please place it in the root directory or evb directory.")
+        exit(1)
+
+    logging.info(f'work_path:{work_path}')
+    logging.info(f'root_path:{root_path}')
+
+if __name__ == "__main__":
 
     # 启动日志
     start_log()
 
     # 处理参数
-    # arg_parse()
+    arg_parse()
 
-    # 需要修改的文件的路径
-    file_name = 'evb/src/gui/Kconfig'
+    # 处理路径
+    deal_path()
 
-    # 定义匹配的正则表达式模式，寻找需要插入的位置。
-    pattern = r'menu "mUI app configurations"'
+    # 增加配置项
+    add_configuration_items()
 
-    # 定义要插入的文本
-    insert_text = f'''
-config {app_configuration_name}
-	bool "enable {app_name} app"
-	default n
-	help
-	  Select this option if you want to support {app_name}.
-'''
-    insert_text_fun(file_name, pattern, insert_text, 1)
+    # 添加源文件参与编译。
+    modify_cmake_file()
 
-    # # 增加配置项
-    # add_configuration_items()
+    # 添加头文件引用。
+    modify_rules_cmake_file()
 
-    # # 添加源文件参与编译。
-    # modify_cmake_file()
+    # 添加资源包ID
+    add_respkg_id()
 
-    # # 添加头文件引用。
-    # modify_rules_cmake_file()
+    # 添加源文件
+    create_source_file()
 
-    # # 添加资源包ID
-    # add_respkg_id()
+    # 添加内部资源
+    create_inner_res()
 
-    # # 添加源文件
-    # create_source_file()
+    # 添加APP的入口。
+    add_entry_function()
+    add_entry_function2()
 
-    # # 添加内部资源
-    # create_inner_res()
+    # 主菜单添加APP 。
+    add_mainframe_entry()
 
-    # # 添加APP的入口。
-    # add_entry_function()
-    # add_entry_function2()
-
-    # # 主菜单添加APP 。
-    # add_mainframe_entry()
-
-    # # 注册APP。
-    # add_app_register()
+    # 注册APP。
+    add_app_register()
