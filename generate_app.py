@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 
 def get_element_value(element):
-    version_pattern = re.compile(f"^# {element}:\\s*(.*)$", re.MULTILINE)
+    version_pattern = re.compile(rf"^# {element}:\s*(.*)$", re.MULTILINE)
     try:
         with open(__file__, 'r', encoding='utf-8') as file:
             content = file.read()
@@ -560,7 +560,7 @@ def arg_parse():
     parser.add_argument('resolution', help='The resolution of the device, for example: asr-128x160 or asr-128x64-FWP.')
 
     # Add otions arguments
-    parser.add_argument('-v','--version', help='Show version.',action='version',version=f'python version:{sys.version}, soft version: {get_element_value(r'@Version')}')
+    parser.add_argument('-v','--version', help='Show version.',action='version',version=f'python version:{sys.version}, soft version: {get_element_value(r"@Version")}')
 
     # Check if there are no arguments
     if len(sys.argv) <= 1:
