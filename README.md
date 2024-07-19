@@ -31,3 +31,7 @@ This exe is packaged based on the following:
 ```TEXT
 pyinstaller 6.9.0
 ```
+
+```CMD
+pyinstaller --onefile generate_app.py
+```
