@@ -9,30 +9,60 @@
 # @Instructions: Place the script in the root directory, modify the name of the app you need, and then execute it. And open the corresponding macro control.
 
 import os
+import sys
 import re
+import argparse
+import logging
 
-# APP 名称
-app_name = 'Aizqq'
-# APP 文件夹名称
+# APP 名称，例如：NewApp
+app_name = 'NewApp'
+
+# APP 文件夹名称，例如：newapp
 app_file_name = f'{app_name.lower()}'
-# APP 配置的名称
-app_configuration_name = f'MMI_SUPPORT_{app_name.upper()}'
-# APP 宏控的宏名
-app_macro_name = f'CONFIG_MMI_SUPPORT_{app_name.upper()}'
-# APP 类名
-app_class_name = app_name
-# 客户端类名
-app_client_class_name = f'{app_name}client'
 
-# 资源文件名称
+# APP 配置项的名称，例如：MMI_SUPPORT_NEWAPP
+app_configuration_name = f'MMI_SUPPORT_{app_name.upper()}'
+
+# APP 宏控的宏名，例如：CONFIG_MMI_SUPPORT_NEWAPP
+app_macro_name = f'CONFIG_MMI_SUPPORT_{app_name.upper()}'
+
+# APP 类名，例如：NewApp
+app_class_name = app_name
+
+# 客户端类名，例如：NewAppclient
+app_client_class_name = f'{app_name}Client'
+
+# 资源文件名称，例如：NewApp_res
 res_h_file_name = f'{app_name}_res'
-# APP 文件名称
+
+# APP 文件名称，例如：NewAppAPP
 app_h_file_name = f'{app_name}APP'
-# 客户端文件名称。
+
+# 客户端文件名称，例如：NewAppClient
 client_h_file_name = f'{app_name}Client'
 
 # 分辨率
-resolving_power = 'asr-480x960'
+resolution = 'asr-480x960'
+
+def insert_text_fun(file_name, pattern, insert_text, position):
+    try:
+        # 读取文件内容
+        with open(file_name, 'r', encoding='utf-8') as file:
+            if insert_text in file.read():
+                return logging.info(f'Content repetition:{insert_text}')
+            lines = file.readlines()
+
+        # 找到匹配的位置
+        for i in range(len(lines)):
+            line = lines[i].strip()
+            if pattern in line:
+                lines.insert(i + position, insert_text) # 插入位置在匹配行的下一行
+
+        # 写入文件
+        with open(file_name, 'w') as file:
+            file.writelines(lines)
+    except FileNotFoundError:
+        logging.error(f"File {file_name} not exist!")
 
 def add_configuration_items():
 
@@ -60,50 +90,6 @@ config {app_configuration_name}
         line = lines[i].strip()
         if re.match(pattern, line):
             lines.insert(i + 1, insert_text) # 插入位置在匹配行的下一行
-
-    # 写入文件
-    with open(file_name, 'w') as file:
-        file.writelines(lines)
-
-def add_macro_controller():
-
-    # 文件名
-    file_name = 'evb/src/CMakeLists.txt'
-
-    # 定义要匹配的函数名
-    function_name = 'set(apollo_app_dirs'
-
-    # 定义要插入的文本
-    insert_text = f'''\
-if (DEFINED {app_macro_name})
-set (apollo_app_dirs
-    ${{apollo_app_dirs}}
-    {app_name.lower()}
-)
-endif()
-
-'''
-
-    # 读取文件内容
-    with open(file_name, 'r') as file:
-        lines = file.readlines()
-
-    # 找到函数的开始和结束位置
-    start_index = -1
-    end_index = -1
-    for i, line in enumerate(lines):
-        if function_name in line:
-            start_index = i
-        if start_index != -1 and ')' in line:
-            end_index = i
-            break
-
-    if start_index == -1 or end_index == -1:
-        print(f"Error: Function '{function_name}' not found in file '{file_name}'")
-        return
-
-    # 在函数体的末尾添加所需内容。
-    lines.insert(end_index + 2, insert_text)
 
     # 写入文件
     with open(file_name, 'w') as file:
@@ -519,7 +505,7 @@ end_respkg
         f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{res_h_file_name}.cpp":app_res_cpp,
         f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{app_h_file_name}.cpp":app_app_cpp,
         f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{client_h_file_name}.cpp":app_client_cpp,
-        f"evb/src/gui/mgapollo/resdesc/{resolving_power}/{app_name.lower()}/include/{app_name.lower()}.res.c":app_res_c,
+        f"evb/src/gui/mgapollo/resdesc/{resolution}/{app_name.lower()}/include/{app_name.lower()}.res.c":app_res_c,
     }
 
     for file_path, file_content in source_file_path.items():
@@ -640,7 +626,7 @@ def add_mainframe_entry():
     # 定义要插入的文本
     insert_text = f'''\
 #ifdef {app_macro_name}
-    {{ Entry{app_name},     STRID_MAINMENU_QTN_MENU_HDR_STK,
+    {{ Entry{app_name},     STRID_APP_CCA_STR_ID_CCA_SETTING_INFO,
         R_sys_img_app_menu_icon_notepad, R_sys_img_app_menu_icon_small_unuse }},
 #endif
 '''
@@ -709,63 +695,89 @@ def add_app_register():
     with open(file_name, 'w') as file:
         file.writelines(lines)
 
-def add_app_mainframe_entrance():
-    pass
+def arg_parse():
+    # Create parameter parser.
+    parser = argparse.ArgumentParser(description='This script is used to generate an ASR platform app.')
+
+    # Add positional arguments
+    parser.add_argument('app_name', help='Name of the app to be created, for example: NewAPP.')
+    parser.add_argument('resolution', help='The resolution of the device, for example: asr-128x160 or asr-128x64-FWP.')
+
+    # Add otions arguments
+    parser.add_argument('-v','--version', help='show version',action='version',version='1.0.0')
+
+    # Check if there are no arguments
+    if len(sys.argv) <= 1:
+        parser.print_help()
+        sys.exit(1)
+
+    # arguments
+    args = parser.parse_args()
+
+    # print log
+    for key,volue in vars(args).items():
+        logging.info(f'{key}:{volue}')
+
+    global app_name
+    app_name = args.app_name
+    global resolution
+    resolution = args.resolution
+
+def start_log():
+    # Set the log level to DEBUG to record logs of all levels
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 if __name__ == "__main__":
 
     # TODO 优化代码减小冗余。
     # TODO 优化代码，如果需要添加的内容已经存在，则不添加。防止重复调用的时候，重复添加字符串。
-    # TODO 优化代码，提供参数输入方式
-    # TODO 优化代码，
 
-    # 增加配置项
-    add_configuration_items()
+    # 启动日志
+    start_log()
 
-    # 增加宏控
-    # add_macro_controller()
+    # 处理参数
+    # arg_parse()
 
-    # 添加源文件参与编译。
-    modify_cmake_file()
+    # 需要修改的文件的路径
+    file_name = 'evb/src/gui/Kconfig'
 
-    # 添加头文件引用。
-    modify_rules_cmake_file()
+    # 定义匹配的正则表达式模式，寻找需要插入的位置。
+    pattern = r'menu "mUI app configurations"'
 
-    # 添加资源包ID
-    add_respkg_id()
+    # 定义要插入的文本
+    insert_text = f'''
+config {app_configuration_name}
+	bool "enable {app_name} app"
+	default n
+	help
+	  Select this option if you want to support {app_name}.
+'''
+    insert_text_fun(file_name, pattern, insert_text, 1)
 
-    # 添加源文件
-    create_source_file()
+    # # 增加配置项
+    # add_configuration_items()
 
-    # 添加内部资源
-    create_inner_res()
+    # # 添加源文件参与编译。
+    # modify_cmake_file()
 
-    # 添加APP的入口。
-    add_entry_function()
-    add_entry_function2()
+    # # 添加头文件引用。
+    # modify_rules_cmake_file()
 
-    # 主菜单添加APP 。
-    add_mainframe_entry()
+    # # 添加资源包ID
+    # add_respkg_id()
 
-    # 注册APP。
-    add_app_register()
+    # # 添加源文件
+    # create_source_file()
 
-    # 5. 增加宏控
-    # 1. 创建源文件
-        # 1. include
-            # 1. demo_res.h
-            # 2. demoAPP.h
-            # 3. democlient.h
-        # 2. src
-            # 1. demo_res.cpp
-            # 2. demoApp.cpp
-            # 3. democlient.cpp
-    # 2. 创建资源描述文件
-        # 1. evb/src/gui/mgapollo/resdesc/asr-480x960/demo/include/demo.res.c
-    # 3. 创建图片内联的文件夹
-        # evb/src/gui/mgapollo/CMakeLists.txt的 CONFIG_UI_RES_MAKE_RESPKG_IMAGE里面
-    # 3. 修改源文件。
-    # 4. 修改cmake，将源文件加入编译。
-        # 1. 在evb/src/gui/mgapollo/CMakeLists.txt中增加 apps/demo/src/*.cpp
+    # # 添加内部资源
+    # create_inner_res()
 
-    # 增加入口函数。
+    # # 添加APP的入口。
+    # add_entry_function()
+    # add_entry_function2()
+
+    # # 主菜单添加APP 。
+    # add_mainframe_entry()
+
+    # # 注册APP。
+    # add_app_register()
