@@ -5,7 +5,7 @@
 # @Auther: zhengqingquan
 # @Create: 2024/07/18
 # @Update: 2024/07/19
-# @Version: 1.0.0
+# @Version: 1.0.1
 # @Brief: Based on ASR platform code, it is possible to automatically generate Python scripts for the APP.
 # @Instructions: Place the script in the root directory, modify the name of the app you need, and then execute it. And open the corresponding macro control.
 
@@ -199,11 +199,11 @@ def create_source_file():
 #define RESID(name)   R_{app_name}_##name
 
 #include "resdefines.head.h"
-#include "{app_name}.res.c"
+#include "{res_c_file_name}.res.c"
 #include "resundefines.h"
 
 #include "resdefines.name.h"
-#include "{app_name}.res.c"
+#include "{res_c_file_name}.res.c"
 #include "resundefines.h"
 
 #undef RESID
@@ -300,11 +300,11 @@ USE_NGUX_NAMESPACE
 #define RESID(name)   R_{app_name}_##name
 
 #include "resdefines.source.h"
-#include "{app_name}.res.c"
+#include "{res_c_file_name}.res.c"
 #include "resundefines.h"
 
 #include "resdefines.init.h"
-#include "{app_name}.res.c"
+#include "{res_c_file_name}.res.c"
 #include "resundefines.h"
 
 #undef RESID
@@ -459,7 +459,7 @@ end_respkg
         root_path.joinpath(f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{res_h_file_name}.cpp"):app_res_cpp,
         root_path.joinpath(f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{app_h_file_name}.cpp"):app_app_cpp,
         root_path.joinpath(f"evb/src/gui/mgapollo/apps/{app_name.lower()}/src/{client_h_file_name}.cpp"):app_client_cpp,
-        root_path.joinpath(f"evb/src/gui/mgapollo/resdesc/{resolution}/{app_name.lower()}/include/{app_name.lower()}.res.c"):app_res_c,
+        root_path.joinpath(f"evb/src/gui/mgapollo/resdesc/{resolution}/{app_name.lower()}/include/{res_c_file_name}.res.c"):app_res_c,
     }
 
     for file_path, file_content in source_file_path.items():
@@ -646,6 +646,9 @@ if __name__ == "__main__":
 
     # 客户端文件名称，例如：NewAppClient
     client_h_file_name = f'{app_name}Client'
+
+    # 资源描述文件名称，例如：newapp
+    res_c_file_name = f'{app_name.lower()}'
 
     # 增加配置项
     add_configuration_items()
